@@ -193,8 +193,10 @@
     </section><!-- Preview Section -->
     <section id="section-preview" class="hidden animate-fade-in">
      <div id="modul-output" class="bg-white rounded-2xl card-shadow overflow-hidden"><!-- Will be populated by JavaScript -->
-     </div><!-- Copy Button -->
-     <div class="no-print mt-6 flex flex-col sm:flex-row gap-3"><button onclick="copyModulContent()" class="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-200">
+     </div><!-- Action Buttons -->
+     <div class="no-print mt-6 flex flex-col sm:flex-row gap-3"><button onclick="saveCurrentModul()" id="btn-save-modul" class="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-blue-200">
+       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+       </svg> Simpan ke Riwayat </button> <button onclick="copyModulContent()" class="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-200">
        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
        </svg> Salin Modul </button> <button onclick="switchTab('input')" class="px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2">
        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
@@ -682,25 +684,75 @@
             // Simulate processing time for better UX
             await new Promise(resolve => setTimeout(resolve, 800));
             
-            // Save to Data SDK
-            if (window.dataSdk) {
-                const result = await window.dataSdk.create(formData);
-                if (!result.isOk) {
-                    showLoading(false);
-                    isLoading = false;
-                    showToast('Gagal menyimpan modul. Silakan coba lagi.', 'error');
-                    return;
-                }
-            }
-            
             currentModulData = formData;
             generateModulPreview(formData);
             
             showLoading(false);
             isLoading = false;
             switchTab('preview');
-            showToast('Modul berhasil dibuat dan disimpan!', 'success');
+            showToast('Modul berhasil dibuat! Klik "Simpan ke Riwayat" untuk menyimpannya.', 'success');
         });
+
+        // Save current modul to history
+        async function saveCurrentModul() {
+            if (!currentModulData || isLoading) return;
+            
+            // Check if already saved (has __backendId)
+            if (currentModulData.__backendId) {
+                showToast('Modul ini sudah tersimpan di riwayat', 'info');
+                return;
+            }
+            
+            // Check limit
+            if (savedModules.length >= 999) {
+                showToast('Batas penyimpanan tercapai (999 modul). Hapus beberapa modul untuk melanjutkan.', 'error');
+                return;
+            }
+            
+            isLoading = true;
+            const saveButton = document.getElementById('btn-save-modul');
+            if (saveButton) {
+                saveButton.disabled = true;
+                saveButton.innerHTML = `
+                    <div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Menyimpan...</span>
+                `;
+            }
+            
+            // Save to Data SDK
+            if (window.dataSdk) {
+                const result = await window.dataSdk.create(currentModulData);
+                if (result.isOk) {
+                    showToast('Modul berhasil disimpan ke riwayat!', 'success');
+                    
+                    // Update button to show saved state
+                    if (saveButton) {
+                        saveButton.innerHTML = `
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span>Tersimpan</span>
+                        `;
+                        saveButton.classList.remove('from-blue-600', 'to-blue-700', 'hover:from-blue-700', 'hover:to-blue-800');
+                        saveButton.classList.add('from-green-600', 'to-green-700', 'cursor-default');
+                    }
+                } else {
+                    showToast('Gagal menyimpan modul. Silakan coba lagi.', 'error');
+                    // Reset button
+                    if (saveButton) {
+                        saveButton.disabled = false;
+                        saveButton.innerHTML = `
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                            </svg>
+                            <span>Simpan ke Riwayat</span>
+                        `;
+                    }
+                }
+            }
+            
+            isLoading = false;
+        }
 
         // Reset form
         function resetForm() {
@@ -2462,5 +2514,5 @@
         // Initialize on load
         initApp();
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c7f9b2ed2a6ca88',t:'MTc3MDA5NzM1OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c7fb573d5e94083',t:'MTc3MDA5ODQzNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
